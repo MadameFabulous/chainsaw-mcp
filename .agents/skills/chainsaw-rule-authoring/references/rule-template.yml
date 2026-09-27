@@ -1,0 +1,33 @@
+# Chainsaw rule template. Save with chainsaw_save_rule(name, yaml_text).
+title: <Short imperative title>
+group: <Persistence | Lateral Movement | Credential Access | Defence Evasion | Execution | Custom>
+description: <What the rule detects and why it matters>
+authors:
+  - <you>
+kind: evtx            # evtx | mft | json | jsonl | xml | esedb | hve | shimcache | srum
+level: medium         # critical | high | medium | low | info
+status: experimental  # stable | experimental
+timestamp: Event.System.TimeCreated_attributes.SystemTime
+fields:
+  - name: Event ID
+    to: Event.System.EventID
+  - name: Computer
+    to: Event.System.Computer
+  - name: User
+    to: Event.EventData.SubjectUserName
+  - name: Image
+    to: Event.EventData.Image
+  - name: Command Line
+    to: Event.EventData.CommandLine
+filter:
+  condition: process and suspicious and not allowlist
+  process:
+    Event.System.Provider_attributes.Name: Microsoft-Windows-Sysmon
+    Event.System.EventID: 1
+  suspicious:
+    Event.EventData.CommandLine:
+      - i*-enc*
+      - i*frombase64string*
+  allowlist:
+    Event.EventData.ParentImage:
+      - i*\\ccmexec.exe

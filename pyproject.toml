@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chainsaw-mcp"
+version = "0.1.0"
+description = "MCP server (spec 2026-07-28) wrapping the Chainsaw forensic artefact hunting tool"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "chainsaw-mcp contributors" }]
+keywords = ["mcp", "chainsaw", "dfir", "forensics", "evtx", "sigma", "threat-hunting", "windows"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "httpx>=0.28,<1",
+    "mcp>=2.2.0,<3",
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MadameFabulous/chainsaw-mcp"
+Repository = "https://github.com/MadameFabulous/chainsaw-mcp"
+Issues = "https://github.com/MadameFabulous/chainsaw-mcp/issues"
+Changelog = "https://github.com/MadameFabulous/chainsaw-mcp/blob/main/CHANGELOG.md"
+
+[project.scripts]
+chainsaw-mcp = "chainsaw_mcp.cli:main"
+chainsaw-mcp-bootstrap = "chainsaw_mcp.bootstrap:main"
+
+[dependency-groups]
+dev = [
+    "anyio>=4.0",
+    "httpx>=0.28",
+    "pytest>=8.4",
+    "pytest-cov>=6,<8",
+    "mypy>=1.15,<2",
+    "hatchling>=1.27,<2",
+    "types-PyYAML>=6",
+    "ruff>=0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chainsaw_mcp"]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers"
+testpaths = ["tests"]
+markers = ["integration: needs chainsaw binary, vendor rules and evidence/EVTX-ATTACK-SAMPLES"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/chainsaw_mcp"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[tool.coverage.run]
+source = ["chainsaw_mcp"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 70

@@ -1,0 +1,45 @@
+# Reference copy of the unit deploy/render-unit.sh produces, with example values
+# (checkout /home/mcp/chainsaw-mcp, service user mcp, Tailscale address 100.64.0.1).
+# Do not install this file directly: render-unit.sh regenerates it with the target's
+# home directory, hostname and bind address, and deploy/deploy-node.sh installs the result.
+[Unit]
+Description=chainsaw-mcp streamable HTTP server (Chainsaw forensic hunting over MCP)
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mcp/chainsaw-mcp
+EnvironmentFile=-/home/mcp/chainsaw-mcp/.env
+Environment=PATH=/home/mcp/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=CHAINSAW_HOME=/home/mcp/chainsaw-mcp
+Environment=CHAINSAW_EVIDENCE_ROOTS=/home/mcp/chainsaw-mcp/evidence
+Environment=CHAINSAW_OUTPUT_DIR=/home/mcp/chainsaw-mcp/.chainsaw-mcp/results
+Environment="MCP_ALLOWED_HOSTS=mcp-host,mcp-host:*,mcp-host.example.ts.net,mcp-host.example.ts.net:*"
+ExecStartPre=/home/mcp/chainsaw-mcp/.venv/bin/chainsaw-mcp --check
+ExecStart=/home/mcp/chainsaw-mcp/.venv/bin/chainsaw-mcp --transport streamable-http --host 100.64.0.1 --port 18098 --path /mcp
+Restart=on-failure
+RestartSec=5s
+# Evidence is read-only for the service; results and custom rules are the only writable trees.
+ReadOnlyPaths=/home/mcp/chainsaw-mcp/evidence
+ReadWritePaths=/home/mcp/chainsaw-mcp/.chainsaw-mcp/results /home/mcp/chainsaw-mcp/custom-rules
+# Requires unprivileged user namespaces; keep runtime and credentials readable.
+PrivateUsers=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+NoNewPrivileges=true
+MemoryMax=4G
+TasksMax=512
+
+[Install]
+WantedBy=default.target

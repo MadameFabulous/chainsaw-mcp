@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chainsaw triage"
+  short_description: "Hunt and timeline Windows event logs with Chainsaw over MCP"
+  default_prompt: "Use $chainsaw-triage to triage the event logs under this evidence path and report attacker activity."

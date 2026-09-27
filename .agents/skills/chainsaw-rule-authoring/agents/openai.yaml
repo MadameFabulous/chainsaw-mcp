@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chainsaw rule authoring"
+  short_description: "Write, lint and test Chainsaw detection rules"
+  default_prompt: "Use $chainsaw-rule-authoring to turn this behaviour into a validated Chainsaw rule with positive and negative tests."

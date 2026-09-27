@@ -1,0 +1,22 @@
+[
+  {
+    "id": "headless_browser_unknown_purpose",
+    "expected_classification": "insufficient_context",
+    "record": {"rule": "Headless Browser Execution", "level": "medium", "Image": "browser.exe", "CommandLine": "browser.exe --headless --dump-dom https://example.org/", "observed_action": "Fetched a public web page. The initiating task and purpose were not captured."}
+  },
+  {
+    "id": "headless_browser_approved_check",
+    "expected_classification": "likely_benign",
+    "record": {"rule": "Headless Browser Execution", "level": "medium", "Image": "browser.exe", "CommandLine": "browser.exe --headless --dump-dom https://example.org/", "analyst_context": "A scheduled accessibility check requested this page snapshot. The account, target and arguments match the approved monitoring job."}
+  },
+  {
+    "id": "application_firewall_rule_unknown_purpose",
+    "expected_classification": "insufficient_context",
+    "record": {"rule": "New Application Firewall Rule", "level": "medium", "observed_action": "A firewall allow rule was added for an installed file-sync application. The initiating actor and task were not captured; no other activity was supplied."}
+  },
+  {
+    "id": "application_firewall_rule_approved_install",
+    "expected_classification": "likely_benign",
+    "record": {"rule": "New Application Firewall Rule", "level": "medium", "observed_action": "A firewall allow rule was added for an installed file-sync application.", "analyst_context": "The software deployment record verifies the installer, executable path, requested ports and actor against approved change SAMPLE-44; they match this event."}
+  }
+]

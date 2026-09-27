@@ -1,0 +1,37 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+integration-results.xml
+build/
+dist/
+*.egg-info/
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Chainsaw binary, bundled rules and Sigma tree (installed by chainsaw-mcp-bootstrap)
+vendor/
+
+# Server scratch: paged result files
+.chainsaw-mcp/
+
+# Evidence is never committed; public sample sets live as upstream clones under evidence/.
+evidence/
+
+# Downloads
+*.zip
+*.tar.gz
+
+# Editors / Claude Code per-machine settings
+.idea/
+.vscode/
+.DS_Store
+.claude/settings.local.json

