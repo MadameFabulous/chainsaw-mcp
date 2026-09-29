@@ -6,6 +6,21 @@ on:
 permissions:
   contents: read
 jobs:
+  container:
+    name: docker-remote-workflow
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.12.19'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Build self-contained image and exercise authenticated remote workflow
+        run: bash scripts/container-check.sh
   unit:
     name: unit-quality
     runs-on: ubuntu-24.04

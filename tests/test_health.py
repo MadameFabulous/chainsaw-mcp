@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import ssl
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,7 +18,7 @@ SPEC.loader.exec_module(health)
 
 
 @pytest.fixture
-def peer():
+def peer(tls_files):
     state = {"sse": False, "failure": None, "requests": []}
 
     class Handler(BaseHTTPRequestHandler):
@@ -64,10 +65,14 @@ def peer():
             self.end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(*tls_files)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    state["ca_file"] = tls_files[0]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{server.server_port}/mcp", state
+        yield f"https://127.0.0.1:{server.server_port}/mcp", state
     finally:
         server.shutdown()
         server.server_close()
@@ -78,7 +83,11 @@ def peer():
 def test_probe_negotiates_protocol_lists_tools_and_closes_session(peer, sse):
     url, state = peer
     state["sse"] = sse
-    assert health.probe(url) == {"url": url, "tools": 1, "protocol": "2025-11-25"}
+    assert health.probe(url, ca_file=state["ca_file"]) == {
+        "url": url,
+        "tools": 1,
+        "protocol": "2025-11-25",
+    }
     requests = state["requests"]
     assert [r[0] for r in requests] == [
         "initialize",
@@ -102,7 +111,7 @@ def test_probe_fails_closed_and_releases_established_sessions(peer, failure, mes
     url, state = peer
     state["failure"] = failure
     with pytest.raises(RuntimeError, match=message):
-        health.probe(url)
+        health.probe(url, ca_file=state["ca_file"])
     if failure != "http":
         assert state["requests"][-1][0] == "DELETE"
 
@@ -111,7 +120,18 @@ def test_probe_reads_bearer_from_file(peer, tmp_path):
     url, state = peer
     token = tmp_path / "token"
     token.write_text("test-only-secret\n")
-    health.probe(url, bearer_token_file=token)
+    token.chmod(0o600)
+    health.probe(url, bearer_token_file=token, ca_file=state["ca_file"])
+    assert all(r[1]["Authorization"] == "Bearer test-only-secret" for r in state["requests"])
+
+
+def test_probe_warns_but_proceeds_with_shared_token_file(peer, tmp_path, capsys):
+    url, state = peer
+    token = tmp_path / "token"
+    token.write_text("test-only-secret\n")
+    token.chmod(0o644)
+    health.probe(url, bearer_token_file=token, ca_file=state["ca_file"])
+    assert "group or other" in capsys.readouterr().err
     assert all(r[1]["Authorization"] == "Bearer test-only-secret" for r in state["requests"])
 
 
@@ -120,7 +140,7 @@ def test_probe_rejects_invalid_token_before_connecting(tmp_path, value):
     token = tmp_path / "token"
     token.write_text(value)
     with pytest.raises(ValueError, match="Invalid MCP health token"):
-        health.probe("http://127.0.0.1:1/mcp", bearer_token_file=token)
+        health.probe("https://127.0.0.1:1/mcp", bearer_token_file=token)
 
 
 @pytest.mark.parametrize(

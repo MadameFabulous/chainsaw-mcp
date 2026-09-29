@@ -51,11 +51,13 @@ class ResultMeta:
     inputs: dict[str, Any] = field(default_factory=dict)
     format: str = "jsonl"
     columns: list[str] = field(default_factory=list)
+    commands: list[list[str]] = field(default_factory=list)
 
     def public(self) -> dict[str, Any]:
         """Client-facing view: the command line holds server-absolute paths and stays private."""
         data = asdict(self)
         del data["argv"]
+        del data["commands"]
         data["created_iso"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.created))
         return data
 
@@ -120,6 +122,7 @@ class ResultStore:
         inputs: dict[str, Any],
         fmt: str = "jsonl",
         columns: list[str] | None = None,
+        commands: list[list[str]] | None = None,
     ) -> ResultMeta:
         self._check(handle)
         if handle not in self._active:
@@ -135,6 +138,7 @@ class ResultStore:
             inputs=inputs,
             format=fmt,
             columns=columns or [],
+            commands=commands or [],
         )
         path.chmod(0o600)
         temporary = self.directory / f".{handle}.meta.pending"

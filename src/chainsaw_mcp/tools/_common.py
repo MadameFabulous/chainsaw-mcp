@@ -11,6 +11,8 @@ from ..paths import PathError, display_path, resolve_under
 from ..results import ResultStore
 from ..rules import RuleCatalog
 from ..runner import Runner
+from ..transfers import key_id, load_private_key, load_trusted_keys
+from ..uploads import UploadStore
 
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
 _TZ = re.compile(r"^[A-Za-z][A-Za-z0-9_+\-/]{0,60}$")
@@ -25,6 +27,25 @@ class ToolContext:
         self.runner = Runner(settings.binary, timeout=settings.timeout, threads=settings.threads)
         self.store = ResultStore(settings.output_dir)
         self.catalog = RuleCatalog(settings)
+        self.transfer_key = (
+            load_private_key(settings.transfer_signing_key_file)
+            if settings.transfer_signing_key_file
+            else None
+        )
+        self.custody_keys = load_trusted_keys(settings.custody_trusted_keys_dir, purpose="custody")
+        if self.transfer_key:
+            public = self.transfer_key.public_key()
+            self.custody_keys[key_id(public)] = public
+        self.uploads = (
+            UploadStore(
+                settings.upload_dir,
+                max_bytes=settings.upload_max_bytes,
+                quota_bytes=settings.upload_quota_bytes,
+                trusted_keys=load_trusted_keys(settings.upload_trusted_keys_dir),
+            )
+            if settings.upload_dir
+            else None
+        )
 
     def evidence(self, raw: str) -> str:
         return str(resolve_under(raw, self.settings.evidence_roots, what="evidence path"))

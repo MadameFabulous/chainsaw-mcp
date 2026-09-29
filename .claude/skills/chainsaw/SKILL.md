@@ -24,6 +24,9 @@ Pick the depth:
 - **Turn a behaviour into a detection**: run `rule-authoring-loop` with
   `args: {behaviour, positive: "<evidence that must match>", negative?: "<clean evidence>"}`
   or follow `.agents/skills/chainsaw-rule-authoring/SKILL.md` by hand.
+- **Prepare a formal report from findings**: follow
+  `.agents/skills/chainsaw-reporting/SKILL.md` for evidence references, incident response
+  formatting, an adaptable Markdown template and preservation of supporting exports.
 
 Rules of the road:
 

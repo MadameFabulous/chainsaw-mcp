@@ -4,28 +4,40 @@ import argparse
 import contextlib
 import http.client
 import json
+import os
+import ssl
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
 
-def probe(url, timeout=5, bearer_token_file=None):
+def probe(url, timeout=5, bearer_token_file=None, bearer_token=None, ca_file=None):
     target = urlsplit(url)
-    if target.scheme not in {"http", "https"} or not target.hostname:
-        raise ValueError("Expected an HTTP(S) MCP URL")
-    connection_type = (
-        http.client.HTTPSConnection if target.scheme == "https" else http.client.HTTPConnection
-    )
+    if target.scheme != "https" or not target.hostname or target.username or target.password:
+        raise ValueError("Expected an HTTPS MCP URL without URL credentials")
+    context = ssl.create_default_context(cafile=ca_file)
     headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
     if bearer_token_file:
-        token = Path(bearer_token_file).expanduser().read_text().strip()
+        token_path = Path(bearer_token_file).expanduser()
+        if token_path.stat().st_mode & 0o077:
+            # The server refuses such a file; the probe only warns so health checks keep working.
+            print(
+                f"warning: {token_path} grants group or other access; chmod 0400 or 0600",
+                file=sys.stderr,
+            )
+        token = token_path.read_text().strip()
         if not token or "\n" in token or "\r" in token:
             raise ValueError("Invalid MCP health token file")
         headers["Authorization"] = "Bearer " + token
+    elif bearer_token:
+        headers["Authorization"] = "Bearer " + bearer_token
     path = target.path or "/mcp"
 
     def request(body=None, method="POST"):
-        conn = connection_type(target.hostname, target.port, timeout=timeout)
+        conn = http.client.HTTPSConnection(
+            target.hostname, target.port, timeout=timeout, context=context
+        )
         try:
             conn.request(method, path, body=json.dumps(body) if body else None, headers=headers)
             response = conn.getresponse()
@@ -80,13 +92,32 @@ def probe(url, timeout=5, bearer_token_file=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("url")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        default=f"https://127.0.0.1:{os.environ.get('MCP_PORT', '18098')}"
+        f"{os.environ.get('MCP_PATH', '/mcp')}",
+    )
     parser.add_argument("--attempts", type=int, default=10)
-    parser.add_argument("--bearer-token-file", help="Read the endpoint token from a local file")
+    parser.add_argument("--ca-file", default=os.environ.get("MCP_TLS_CA_FILE"))
+    parser.add_argument(
+        "--bearer-token-file",
+        default=os.environ.get("MCP_AUTH_TOKEN_FILE"),
+        help="Read the endpoint token from a local file",
+    )
     args = parser.parse_args()
     for attempt in range(args.attempts):
         try:
-            print(json.dumps(probe(args.url, bearer_token_file=args.bearer_token_file)))
+            print(
+                json.dumps(
+                    probe(
+                        args.url,
+                        bearer_token_file=args.bearer_token_file,
+                        bearer_token=os.environ.get("MCP_AUTH_TOKEN"),
+                        ca_file=args.ca_file,
+                    )
+                )
+            )
             return
         except Exception as exc:
             if attempt + 1 == args.attempts:

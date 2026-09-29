@@ -217,9 +217,15 @@ class EvidenceTools:
                 for (p, c, e), n in combinations.items()
             ),
             "chainsaw_analyse_evtx_coverage",
-            result.argv,
+            dump_result.argv if dump_result else [],
         )
-        handle = save_analysis_rows(ctx, data, "chainsaw_analyse_evtx", result.argv)
+        handle = save_analysis_rows(
+            ctx,
+            data,
+            "chainsaw_analyse_evtx",
+            result.argv,
+            commands=[result.argv] + ([dump_result.argv] if dump_result else []),
+        )
         response = {
             "handle": handle,
             "coverage_handle": coverage_handle,
@@ -262,14 +268,19 @@ def _metadata_value(value: Any) -> str | None:
 
 
 def save_analysis_rows(
-    ctx: ToolContext, rows: Iterable[dict[str, Any]], tool: str, argv: list[str]
+    ctx: ToolContext,
+    rows: Iterable[dict[str, Any]],
+    tool: str,
+    argv: list[str],
+    *,
+    commands: list[list[str]] | None = None,
 ) -> str:
     handle, path = ctx.store.reserve()
     try:
         with path.open("w", encoding="utf-8") as fh:
             for row in rows:
                 fh.write(json.dumps(row, ensure_ascii=True) + "\n")
-        ctx.store.commit(handle, tool=tool, argv=argv, inputs={})
+        ctx.store.commit(handle, tool=tool, argv=argv, inputs={}, commands=commands)
         return handle
     finally:
         ctx.store.abort(handle)

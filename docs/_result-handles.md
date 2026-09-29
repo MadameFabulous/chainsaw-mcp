@@ -6,6 +6,13 @@ with a sidecar `<handle>.meta.json`. Handles look like `res_0123456789abcdef`, e
 seven days, and are the only cross-call state the server keeps. This matches the 2026-07-28
 guidance that servers stay stateless per request and mint opaque handles for anything large.
 
+For a signed file download, fetch `chainsaw_result_manifest(handle)` and verify its Ed25519
+signature against the independently pinned server public key. Download the original stored
+file through `chainsaw_result_chunk`, then compare its exact byte count and SHA-256 with the
+signed manifest before accepting it. Remote connections require HTTPS. The supplied client
+performs these checks and saves a signature receipt; see `docs/secure-transfers.md`.
+Projected pages and format-converted exports are not the same bytes as the signed file.
+
 ### Bounded delivery and continuation
 
 Pages, exports and projected previews default to 65,536 encoded JSON bytes, with a

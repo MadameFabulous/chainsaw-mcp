@@ -49,7 +49,9 @@ never by dumping whole logs into context.
    to ten previewed rows with `chainsaw_jev_triage(handle, offset, limit, fields=[...])`.
    This ships the selected fields to an external API; choose fields deliberately and treat
    the returned classification and priority as advisory, never as a finding.
-10. **Clean up.** `chainsaw_result_delete` handles you no longer need; they contain log data.
+10. **Preserve and clean up.** Save the evidence exports, metadata and diagnostics needed by
+    the report before using `chainsaw_result_delete` on handles you no longer need. Handles
+    expire after seven days and are not durable report attachments.
 
 ## Judgement rules
 
@@ -71,6 +73,10 @@ never by dumping whole logs into context.
 - Times are UTC unless you passed `timezone`. State this in the report.
 
 ## Report format
+
+For a formal incident report, interim update or post-incident review, follow
+[`chainsaw-reporting`](../chainsaw-reporting/SKILL.md) for evidence preparation, an adaptable
+report template and sourced incident response guidance. For a brief triage response:
 
 1. Executive summary (three sentences).
 2. Timeline table: time (UTC), host, account, event, detection, confidence, evidence pointer.

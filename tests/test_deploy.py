@@ -255,6 +255,27 @@ def test_rollback_probes_the_listener_of_the_restored_unit(node, previous_host, 
     assert (dest / "old-code").exists()
     assert unit.read_text().startswith("[Service]")
     assert "rollback healthy" in result.stderr, result.stderr
+    # The restored legacy unit serves plain HTTP: the operator must be told to act.
+    assert "unauthenticated plain http" in result.stderr.lower()
+
+
+def test_rollback_to_https_release_does_not_warn_about_plain_http(node):
+    home, dest, incoming, unit, env = node
+    env.update(MCP_HOST="100.64.0.1", MCP_PORT="19000", MCP_PATH="/new-mcp")
+    for tree in (dest, incoming):
+        (tree / "scripts/mcp-health.py").write_text(
+            "import sys\nassert sys.argv[1] == 'https://100.64.0.1:18098/mcp', sys.argv[1]\n"
+        )
+    unit.write_text(
+        "[Service]\n"
+        "# MCP health scheme: https\n"
+        "ExecStart=/app/.venv/bin/chainsaw-mcp --transport streamable-http "
+        "--host 100.64.0.1 --port 18098 --path /mcp\n"
+    )
+    result = run_install(node)
+    assert result.returncode != 0
+    assert "rollback healthy" in result.stderr, result.stderr
+    assert "plain http" not in result.stderr.lower()
 
 
 def test_ship_forwards_the_memory_cap_across_the_ssh_boundary(node):

@@ -17,12 +17,34 @@ from .paths import PathError
 from .results import ResultError
 from .rules import KINDS, RuleError
 from .runner import ChainsawError
-from .tools import AnalyseTools, EvidenceTools, HuntTools, JevTools, ResultTools, RuleTools
+from .tools import (
+    AnalyseTools,
+    CustodyTools,
+    EvidenceTools,
+    HuntTools,
+    JevTools,
+    ReproductionTools,
+    ResultTools,
+    RuleTools,
+    UploadTools,
+)
 from .tools._common import ToolContext
 
 INSTRUCTIONS = """\
 Chainsaw hunts Windows forensic artefacts (EVTX event logs, MFT, shimcache, SRUM, registry
 hives) with Sigma and Chainsaw detection rules.
+
+Remote clients can upload files with chainsaw_upload_begin, chainsaw_upload_chunk, then
+chainsaw_upload_finish. Uploads require a trusted Ed25519 signature of the file manifest.
+Use HTTPS for remote connections and the verified path returned by finish. Mounted evidence is
+read-only; incomplete uploads are not evidence. chainsaw_plan generates validated native
+commands before execution when a planned investigation is wanted.
+
+For custody checks, chainsaw_evidence_manifest creates a signed full-directory inventory;
+chainsaw_evidence_validate compares the same scope or a relocated copy and signs a receipt.
+Use around evidence copies, handoffs or analysis when integrity records are needed. Preserve
+both artefact and signature handles before expiry. Operator/handoff fields are declarations;
+these observations do not establish acquisition provenance or a complete custody history.
 
 Recommended flow for an event-log triage:
 1. chainsaw_status, then chainsaw_list_evidence to scope the evidence.
@@ -34,6 +56,9 @@ Recommended flow for an event-log triage:
 5. chainsaw_search with tau expressions to pull surrounding events for a pivot value.
 6. chainsaw_search_rules / chainsaw_get_rule to explain detections; chainsaw_save_rule to
    capture a new detection and chainsaw_lint_rules to validate it.
+7. chainsaw_reproduce(handles=[...]) to document recorded commands and download a replay
+   script and input manifest for the investigation before result handles expire.
+   Use chainsaw_result_manifest and the pinned server public key to verify downloaded files.
 
 Large outputs never come back inline. Hunts, searches and dumps return a result handle
 (res_<hex>) that stays valid across calls; page or aggregate it. Evidence paths are
@@ -54,6 +79,7 @@ _READ_ONLY = {
     "chainsaw_get_mapping",
     "chainsaw_lint_rules",
     "chainsaw_result_page",
+    "chainsaw_result_manifest",
     "chainsaw_result_chunk",
     "chainsaw_result_events",
     "chainsaw_result_summary",
@@ -63,6 +89,12 @@ _READ_ONLY = {
 }
 # Tools that create new server-side state (result handles, rule files) but destroy nothing.
 _ADDITIVE = {
+    "chainsaw_evidence_manifest",
+    "chainsaw_evidence_validate",
+    "chainsaw_plan",
+    "chainsaw_upload_begin",
+    "chainsaw_upload_chunk",
+    "chainsaw_reproduce",
     "chainsaw_hunt",
     "chainsaw_search",
     "chainsaw_dump",
@@ -73,6 +105,13 @@ _ADDITIVE = {
     "chainsaw_analyse_srum",
 }
 _TITLES = {
+    "chainsaw_evidence_manifest": "Chainsaw: create signed evidence manifest",
+    "chainsaw_evidence_validate": "Chainsaw: validate evidence against a signed manifest",
+    "chainsaw_plan": "Chainsaw: plan investigation commands",
+    "chainsaw_upload_begin": "Chainsaw: begin evidence upload",
+    "chainsaw_upload_chunk": "Chainsaw: upload evidence chunk",
+    "chainsaw_upload_finish": "Chainsaw: finish or resume evidence upload",
+    "chainsaw_reproduce": "Chainsaw: reproduce investigation commands",
     "chainsaw_status": "Chainsaw: server status",
     "chainsaw_list_evidence": "Chainsaw: list evidence",
     "chainsaw_analyse_evtx": "Chainsaw: EVTX overview",
@@ -84,6 +123,7 @@ _TITLES = {
     "chainsaw_search": "Chainsaw: search events",
     "chainsaw_dump": "Chainsaw: dump records",
     "chainsaw_result_page": "Chainsaw: page a result",
+    "chainsaw_result_manifest": "Chainsaw: sign a result download manifest",
     "chainsaw_result_chunk": "Chainsaw: read result text chunks",
     "chainsaw_result_events": "Chainsaw: group detections by event",
     "chainsaw_process_lineage": "Chainsaw: pivot process lineage",
@@ -151,11 +191,14 @@ class ToolGroup(Protocol):
 def collect_tools(ctx: ToolContext) -> dict[str, Callable[..., str]]:
     groups: list[ToolGroup] = [
         EvidenceTools(ctx),
+        CustodyTools(ctx),
         HuntTools(ctx),
         AnalyseTools(ctx),
         ResultTools(ctx),
         RuleTools(ctx),
         JevTools(ctx),
+        ReproductionTools(ctx),
+        UploadTools(ctx),
     ]
     tools: dict[str, Callable[..., str]] = {}
     for group in groups:

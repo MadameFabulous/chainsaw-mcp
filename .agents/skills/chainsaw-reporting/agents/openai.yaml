@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chainsaw reporting"
+  short_description: "Prepare incident reports with traceable Chainsaw evidence"
+  default_prompt: "Use $chainsaw-reporting to prepare an incident response report from the available Chainsaw findings, citing evidence and stating coverage limits."

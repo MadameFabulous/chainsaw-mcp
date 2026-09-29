@@ -57,7 +57,15 @@ def test_stdio_dispatch(settings, monkeypatch):
     server.run.assert_called_once_with(transport="stdio")
 
 
-def test_http_dispatch_preserves_security(settings, monkeypatch):
+def test_http_dispatch_preserves_security(settings, monkeypatch, tls_files):
+    import uvicorn
+
+    cert, key = tls_files
+    monkeypatch.setenv("MCP_TLS_CERT_FILE", str(cert))
+    monkeypatch.setenv("MCP_TLS_KEY_FILE", str(key))
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "a" * 64)
+    run = Mock()
+    monkeypatch.setattr(uvicorn, "run", run)
     server = Mock()
     monkeypatch.setattr(cli, "load_settings", lambda: settings)
     monkeypatch.setattr(cli, "build_server", lambda value: server)
@@ -77,9 +85,11 @@ def test_http_dispatch_preserves_security(settings, monkeypatch):
         )
         == 0
     )
-    kwargs = server.run.call_args.kwargs
-    assert kwargs["transport"] == "streamable-http"
-    assert kwargs["port"] == 19001
+    kwargs = server.streamable_http_app.call_args.kwargs
+    assert run.call_args.kwargs["port"] == 19001
+    assert run.call_args.kwargs["ssl_certfile"] == str(cert)
+    assert run.call_args.kwargs["ssl_keyfile"] == str(key)
+    assert run.call_args.kwargs["proxy_headers"] is False
     assert kwargs["streamable_http_path"] == "/custom"
     assert kwargs["json_response"] is True
     assert kwargs["stateless_http"] is True

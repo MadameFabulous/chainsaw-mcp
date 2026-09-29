@@ -25,6 +25,7 @@ Description=chainsaw-mcp streamable HTTP server (Chainsaw forensic hunting over 
 After=default.target
 
 [Service]
+# MCP health scheme: https
 Type=simple
 WorkingDirectory=$home
 EnvironmentFile=-$home/.env

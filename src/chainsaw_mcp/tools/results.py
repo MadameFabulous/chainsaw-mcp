@@ -13,6 +13,7 @@ from pydantic import Field
 
 from ..result_budget import DEFAULT_MAX_BYTES
 from ..result_budget import bounded_dumps as dumps
+from ..transfers import file_fingerprint, sign_manifest
 from ._common import ToolContext
 
 _HANDLE_DESC = "Result handle returned by a hunt, search, dump or analysis tool."
@@ -21,6 +22,30 @@ _HANDLE_DESC = "Result handle returned by a hunt, search, dump or analysis tool.
 class ResultTools:
     def __init__(self, ctx: ToolContext) -> None:
         self.ctx = ctx
+
+    def chainsaw_result_manifest(
+        self,
+        handle: Annotated[str, Field(description=_HANDLE_DESC)],
+    ) -> str:
+        """Sign a stored file's handle, format, exact byte count and SHA-256 with Ed25519.
+
+        Verify this attestation against the server public key obtained independently, then
+        download the complete file with chainsaw_result_chunk and verify its size and hash.
+        Requires CHAINSAW_TRANSFER_SIGNING_KEY_FILE; never falls back to an unsigned manifest.
+        The signature authenticates the exported bytes, not historical acquisition provenance.
+        """
+        key = self.ctx.transfer_key
+        if key is None:
+            raise ValueError("Signed downloads require CHAINSAW_TRANSFER_SIGNING_KEY_FILE")
+        meta = self.ctx.store.meta(handle)
+        manifest = {
+            "version": 1,
+            "purpose": "download",
+            "handle": handle,
+            "format": meta.format,
+            **file_fingerprint(self.ctx.store.data_path(handle, "." + meta.format)),
+        }
+        return dumps(sign_manifest(manifest, key))
 
     def chainsaw_result_page(
         self,
@@ -243,6 +268,7 @@ class ResultTools:
         return dumps({"handle": handle, "deleted": removed})
 
     TOOLS = (
+        "chainsaw_result_manifest",
         "chainsaw_result_chunk",
         "chainsaw_result_events",
         "chainsaw_result_page",

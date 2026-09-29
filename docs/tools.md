@@ -10,19 +10,24 @@ Generated from the live server schema by `scripts/gen-tool-docs.py`. All tools r
 | `chainsaw_analyse_srum` | no | no | Analyse the System Resource Usage Monitor (SRUM) database. |
 | `chainsaw_delete_rule` | no | yes | Delete a custom rule. Bundled Chainsaw and Sigma rules cannot be deleted. |
 | `chainsaw_dump` | no | no | Convert every record in the evidence to JSON under a result handle. |
+| `chainsaw_evidence_manifest` | no | no | Create a signed SHA-256 inventory to support chain-of-custody documentation. |
+| `chainsaw_evidence_validate` | no | no | Verify a signed manifest and compare the full evidence directory against it. |
 | `chainsaw_get_mapping` | yes | no | Describe a Sigma-to-event-log mapping file: groups, filters, field translations. |
 | `chainsaw_get_rule` | yes | no | Read one rule's YAML and parsed summary, or list a rule directory. |
 | `chainsaw_hunt` | no | no | Hunt evidence with Sigma and Chainsaw detection rules. |
 | `chainsaw_jev_triage` | no | no | Send selected result rows to TypeSafe Jev for advisory classification and priority. |
 | `chainsaw_lint_rules` | yes | no | Validate rules with `chainsaw lint` and report which files fail to load and why. |
 | `chainsaw_list_evidence` | yes | no | List artefact files below an evidence path with sizes and types. |
+| `chainsaw_plan` | no | no | Generate validated Chainsaw commands without executing an investigation. |
 | `chainsaw_process_lineage` | no | no | Pivot process GUIDs in explicitly scoped original evidence, including unmatched events. |
+| `chainsaw_reproduce` | no | no | Export recorded Chainsaw commands as a replay script and an investigation manifest. |
 | `chainsaw_result_chunk` | yes | no | Read UTF-8 text chunks of a file or oversized JSON row. Resume next_byte_offset. |
 | `chainsaw_result_delete` | no | yes | Delete a stored result and its metadata. Evidence files are never touched. |
 | `chainsaw_result_events` | yes | no | Page unique source-qualified events, retaining every associated rule match. |
 | `chainsaw_result_export` | yes | no | Render a stored result as CSV or JSONL text for reports or other tools. |
 | `chainsaw_result_fields` | yes | no | Discover the field paths present in a result so you can project or group on them. |
 | `chainsaw_result_list` | yes | no | List stored result handles, newest first, with tool, inputs and row counts. |
+| `chainsaw_result_manifest` | yes | no | Sign a stored file's handle, format, exact byte count and SHA-256 with Ed25519. |
 | `chainsaw_result_page` | yes | no | Read a page of rows from a stored result, optionally projected and filtered. |
 | `chainsaw_result_summary` | yes | no | Aggregate a stored result without paging through it. |
 | `chainsaw_rule_stats` | yes | no | Count installed Chainsaw, Sigma and custom rules by level and status, plus mappings. |
@@ -30,6 +35,9 @@ Generated from the live server schema by `scripts/gen-tool-docs.py`. All tools r
 | `chainsaw_search` | no | no | Search evidence for keywords, regular expressions, or tau field expressions. |
 | `chainsaw_search_rules` | yes | no | Find detection rules by keyword, ATT&CK tag, level, status or logsource. |
 | `chainsaw_status` | yes | no | Report server configuration, chainsaw version, rule counts and evidence roots. |
+| `chainsaw_upload_begin` | no | no | Reserve a remote evidence upload after verifying its trusted Ed25519 signature. |
+| `chainsaw_upload_chunk` | no | no | Append an evidence chunk; retrying identical bytes at the same offset is safe. |
+| `chainsaw_upload_finish` | no | yes | Verify the signature, size and SHA-256, then publish a new read-only evidence file. |
 
 ## `chainsaw_analyse_evtx`
 
@@ -116,6 +124,42 @@ Convert every record in the evidence to JSON under a result handle.
 | `skip_errors` | boolean | true | Continue past unreadable files. |
 | `preview` | integer | 10 | Records to include inline. (maximum=100, minimum=0) |
 | `fields` | array[] or null | null | Dotted paths or shorthand names to project in the inline preview; see chainsaw_result_fields. Omit for the standard shorthand columns. |
+
+## `chainsaw_evidence_manifest`
+
+Create a signed SHA-256 inventory to support chain-of-custody documentation.
+
+        Includes all files and directories, including hidden/empty entries; rejects links,
+        special files, unreadable entries and observed changes. Uses relative paths for
+        relocation. Returns manifest_handle and signature_handle; preserve both before expiry.
+        Reads the complete collection subject to byte/entry limits and CHAINSAW_TIMEOUT.
+        It records current observations and operator declarations, not a complete custody chain.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `path` | string | "." | Directory under an allowed evidence root. |
+| `context` | object or null | null | Optional operator declarations: case_id, evidence_id, operator, action, from_custodian, to_custodian, reason, snapshot_id, notes, previous_manifest_sha256. These are supplied claims, not verified identity or custody events. Values are limited to 2048 characters. |
+| `max_entries` | integer | 100000 | Maximum files and directories, including the root. (maximum=100000, minimum=1) |
+| `max_total_bytes` | integer | 68719476736 | Maximum total file bytes to hash; default 64 GiB. (minimum=1) |
+
+## `chainsaw_evidence_validate`
+
+Verify a signed manifest and compare the full evidence directory against it.
+
+        Trust comes from the configured server signing key and CHAINSAW_CUSTODY_TRUSTED_KEYS_DIR,
+        never from the evidence volume. Rejects invalid signatures before scanning the target.
+        Returns match, mismatch or incomplete, plus signed receipt/detail handles. Added,
+        missing, changed and unreadable entries are explicit; mtime differences are separate
+        observations and do not fail a byte-for-byte match. No files are repaired or rewritten.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `manifest` | string | required | Result handle, or saved file under an allowed evidence root (including verified uploads). |
+| `signature` | string | required | Detached evidence-manifest signature. Result handle, or saved file under an allowed evidence root (including verified uploads). |
+| `path` | string | "." | Directory to compare, which may be a relocated copy. |
+| `context` | object or null | null | Optional operator declarations: case_id, evidence_id, operator, action, from_custodian, to_custodian, reason, snapshot_id, notes, previous_manifest_sha256. These are supplied claims, not verified identity or custody events. Values are limited to 2048 characters. |
+| `max_entries` | integer | 100000 | Maximum entries in each inventory, including the root. (maximum=100000, minimum=1) |
+| `max_total_bytes` | integer | 68719476736 | Maximum bytes to hash during comparison; default 64 GiB. (minimum=1) |
 
 ## `chainsaw_get_mapping`
 
@@ -215,6 +259,24 @@ List artefact files below an evidence path with sizes and types.
 | `limit` | integer | 200 | Maximum files to return. (maximum=1000, minimum=1) |
 | `offset` | integer | 0 | Next offset from the preceding page. (minimum=0) |
 
+## `chainsaw_plan`
+
+Generate validated Chainsaw commands without executing an investigation.
+
+        Uses the same parameter validation and argument construction as the real tools.
+        Input files and rules must already exist on the server. Returns downloadable script
+        and manifest handles labelled planned, never executed. EVTX planning covers native
+        analyse evtx only; add a dump step for raw events. Lineage requires observed events
+        and is supported by chainsaw_reproduce after execution. Like reproduce exports, plans
+        contain server-absolute paths by default. Set redact_paths=true for a labelled
+        derivative requiring explicit replay roots; content and relative names are retained.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `steps` | any[] | required | Ordered native investigation steps: tool name and its arguments. |
+| `hash_inputs` | boolean | false | Hash currently mounted/uploaded inputs and check them before replay. |
+| `redact_paths` | boolean | false | Export a labelled derivative with server paths replaced by roots. |
+
 ## `chainsaw_process_lineage`
 
 Pivot process GUIDs in explicitly scoped original evidence, including unmatched events.
@@ -231,6 +293,27 @@ Pivot process GUIDs in explicitly scoped original evidence, including unmatched 
 | `max_events` | integer | 500 | Total events to collect across all hops (1-5000). |
 | `max_queries` | integer | 64 | Searches allowed before traversal stops as incomplete (1-256). |
 | `preview` | integer | 20 | Events to include inline (0-100). |
+
+## `chainsaw_reproduce`
+
+Export recorded Chainsaw commands as a replay script and an investigation manifest.
+
+        Does not rerun the investigation. Preserves filters, time windows and all recorded
+        lineage queries; snapshots mappings, quotes shell arguments, and writes replay output
+        to a new directory. Download script_handle and manifest_handle with
+        chainsaw_result_chunk (follow next_byte_offset) or chainsaw_result_export.
+        Commands reproduce native output; MCP aggregation and lineage filtering are documented
+        separately. Hashes describe inputs at export time and cannot prove past input identity.
+        Exports deliberately contain server-absolute binary, evidence-root and result-store
+        paths for provenance by default. Set redact_paths=true for a labelled derivative
+        requiring explicit replay roots. Content and relative names are not anonymised.
+        Response and manifest partial flags identify legacy EVTX handles with missing commands.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `handles` | string[] | required | Investigation result handles in replay order. Use primary hunt, search, dump or analysis handles; duplicate handles are removed. |
+| `hash_inputs` | boolean | true | Hash evidence and rules now and add replay checks. May read large datasets; these are export-time hashes, not historical acquisition hashes. |
+| `redact_paths` | boolean | false | Export a labelled derivative with server paths replaced by roots. |
 
 ## `chainsaw_result_chunk`
 
@@ -301,6 +384,19 @@ List stored result handles, newest first, with tool, inputs and row counts.
 | `offset` | integer | 0 | First entry to return. (minimum=0) |
 | `limit` | integer | 50 | Entries per page. (maximum=200, minimum=1) |
 | `max_bytes` | integer | 65536 | Encoded JSON byte budget, including metadata. (maximum=131072, minimum=256) |
+
+## `chainsaw_result_manifest`
+
+Sign a stored file's handle, format, exact byte count and SHA-256 with Ed25519.
+
+        Verify this attestation against the server public key obtained independently, then
+        download the complete file with chainsaw_result_chunk and verify its size and hash.
+        Requires CHAINSAW_TRANSFER_SIGNING_KEY_FILE; never falls back to an unsigned manifest.
+        The signature authenticates the exported bytes, not historical acquisition provenance.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `handle` | string | required | Result handle returned by a hunt, search, dump or analysis tool. |
 
 ## `chainsaw_result_page`
 
@@ -409,6 +505,44 @@ Report server configuration, chainsaw version, rule counts and evidence roots.
 
 No parameters.
 
+## `chainsaw_upload_begin`
+
+Reserve a remote evidence upload after verifying its trusted Ed25519 signature.
+
+        Send base64 chunks using chainsaw_upload_chunk, then seal with chainsaw_upload_finish.
+        Incomplete uploads remain outside evidence roots. No archive extraction is performed.
+        Unsigned uploads are rejected; configure CHAINSAW_UPLOAD_TRUSTED_KEYS_DIR on the server.
+        The quota counts retained uploaded evidence plus incomplete reservations.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | required | Original filename, without directories. |
+| `size_bytes` | integer | required | Exact file length in bytes. (minimum=1) |
+| `sha256` | string | required | Expected SHA-256 of the complete evidence file. |
+| `signature` | object or null | null | Trusted Ed25519 attestation of upload name, size and SHA-256. |
+
+## `chainsaw_upload_chunk`
+
+Append an evidence chunk; retrying identical bytes at the same offset is safe.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `upload_id` | string | required | Server-issued upl_ handle. |
+| `offset` | integer | required | Byte offset; use next_offset from the server. (minimum=0) |
+| `data_base64` | string | required | Base64-encoded file bytes; at most 196608 decoded bytes per call. (maxLength=262144) |
+
+## `chainsaw_upload_finish`
+
+Verify the signature, size and SHA-256, then publish a new read-only evidence file.
+
+        Returns an evidence path accepted by all investigation tools. Published evidence
+        cannot be overwritten or deleted. status returns next_offset after a reconnect.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `upload_id` | string | required | Server-issued upl_ handle. |
+| `action` | string | "finish" | finish verifies and publishes; status resumes; abort removes staging. |
+
 ## Resources
 
 - `chainsaw://docs/rule-format`: How to write a Chainsaw detection rule (tau syntax, fields, kinds).
@@ -430,6 +564,13 @@ No parameters.
 with a sidecar `<handle>.meta.json`. Handles look like `res_0123456789abcdef`, expire after
 seven days, and are the only cross-call state the server keeps. This matches the 2026-07-28
 guidance that servers stay stateless per request and mint opaque handles for anything large.
+
+For a signed file download, fetch `chainsaw_result_manifest(handle)` and verify its Ed25519
+signature against the independently pinned server public key. Download the original stored
+file through `chainsaw_result_chunk`, then compare its exact byte count and SHA-256 with the
+signed manifest before accepting it. Remote connections require HTTPS. The supplied client
+performs these checks and saves a signature receipt; see `docs/secure-transfers.md`.
+Projected pages and format-converted exports are not the same bytes as the signed file.
 
 ### Bounded delivery and continuation
 

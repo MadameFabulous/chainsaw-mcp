@@ -63,10 +63,11 @@ class HuntTools:
         duration: float,
         preview: int,
         fields: list[str] | None = None,
+        commands: list[list[str]] | None = None,
     ) -> str:
         store = self.ctx.store
         try:
-            meta = store.commit(handle, tool=tool, argv=argv, inputs=inputs)
+            meta = store.commit(handle, tool=tool, argv=argv, inputs=inputs, commands=commands)
         finally:
             store.abort(handle)
         summary = summarize(store.rows(handle))
@@ -543,6 +544,7 @@ class HuntTools:
         capped = query_capped = False
         query_count = 0
         argv = []
+        commands = []
         messages = []
         duration = 0.0
         hop = 0
@@ -573,6 +575,7 @@ class HuntTools:
                     try:
                         run = self.ctx.runner.run(args)
                         argv = run.argv
+                        commands.append(run.argv)
                         messages.extend(run.messages)
                         duration += run.duration_seconds
                         with path.open(encoding="utf-8") as fh:
@@ -613,6 +616,7 @@ class HuntTools:
                 tool="chainsaw_process_lineage",
                 handle=handle,
                 argv=argv,
+                commands=commands,
                 inputs={
                     "paths": [self.ctx.shown(p) for p in evidence],
                     "computer": computer,

@@ -26,9 +26,12 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
+    "cryptography>=46,<51",
     "httpx>=0.28,<1",
     "mcp>=2.2.0,<3",
     "pyyaml>=6.0",
+    "starlette>=1.0,<2",
+    "uvicorn>=0.47,<1",
 ]
 
 [project.urls]
@@ -40,6 +43,7 @@ Changelog = "https://github.com/MadameFabulous/chainsaw-mcp/blob/main/CHANGELOG.
 [project.scripts]
 chainsaw-mcp = "chainsaw_mcp.cli:main"
 chainsaw-mcp-bootstrap = "chainsaw_mcp.bootstrap:main"
+chainsaw-mcp-transfer = "chainsaw_mcp.transfers:main"
 
 [dependency-groups]
 dev = [

@@ -20,7 +20,7 @@ export MCP_PORT="${MCP_PORT:-18098}"
 export MCP_PATH="${MCP_PATH:-/mcp}"
 probe_host=$MCP_HOST
 if [[ $probe_host == *:* && $probe_host != \[* ]]; then probe_host="[$probe_host]"; fi
-health_url="http://$probe_host:$MCP_PORT$MCP_PATH"
+health_url="https://$probe_host:$MCP_PORT$MCP_PATH"
 backup=$(mktemp -d "$dest.rollback.XXXXXXXX")
 had_old=false
 if [[ -d $dest ]]; then had_old=true; fi
@@ -34,6 +34,7 @@ rollback() {
   set +e
   echo "Deployment failed (status=$rc); restoring previous release" >&2
   failed=0
+  previous_scheme=
   if $stopping; then systemctl --user stop mcp-chainsaw.service || failed=1; fi
   cd "$(dirname "$dest")" || failed=1
   if [[ -d $backup/release ]]; then
@@ -59,7 +60,11 @@ rollback() {
     if [[ -f $backup/unit ]] && [[ $(grep -m1 '^ExecStart=' "$backup/unit") =~ --host\ ([^\ ]+)\ --port\ ([0-9]+)\ --path\ ([^\ ]+) ]]; then
       previous_host=${BASH_REMATCH[1]}
       if [[ $previous_host == *:* && $previous_host != \[* ]]; then previous_host="[$previous_host]"; fi
-      probe_url="http://$previous_host:${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+      previous_port=${BASH_REMATCH[2]}
+      previous_path=${BASH_REMATCH[3]}
+      previous_scheme=http
+      if grep -q '^# MCP health scheme: https$' "$backup/unit"; then previous_scheme=https; fi
+      probe_url="$previous_scheme://$previous_host:$previous_port$previous_path"
     fi
     systemctl --user restart mcp-chainsaw.service || failed=1
     systemctl --user is-active --quiet mcp-chainsaw.service || failed=1
@@ -67,6 +72,13 @@ rollback() {
     if [[ $failed = 0 ]]; then echo 'rollback healthy' >&2; fi
   fi
   if [[ $failed != 0 ]]; then echo "ROLLBACK FAILED; retained recovery files: $backup" >&2; fi
+  if [[ $previous_scheme == http ]]; then
+    {
+      echo '!!! WARNING: the restored release serves UNAUTHENTICATED PLAIN HTTP !!!'
+      echo "!!! $probe_url has no TLS or bearer authentication; stop it or redeploy now !!!"
+    } >&2
+    if [[ ${rc:-0} == 0 ]]; then rc=1; fi
+  fi
   exit "${rc:-1}"
 }
 trap rollback EXIT

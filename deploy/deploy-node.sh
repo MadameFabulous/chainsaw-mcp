@@ -32,7 +32,7 @@ fi
 # Listener and memory-cap overrides travel with the install so the rendered unit matches
 # the request; ssh does not carry the workstation environment across on its own.
 remote_env=""
-for name in MCP_HOST MCP_PORT MCP_PATH MCP_TS_FQDN MCP_MEMORY_MAX; do
+for name in MCP_HOST MCP_PORT MCP_PATH MCP_TS_FQDN MCP_MEMORY_MAX MCP_AUTH_TOKEN_FILE MCP_TLS_CA_FILE; do
   if [[ -n ${!name:-} ]]; then
     printf -v quoted '%q' "${!name}"
     remote_env+="$name=$quoted "

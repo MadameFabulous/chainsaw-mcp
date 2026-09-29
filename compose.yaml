@@ -1,0 +1,69 @@
+services:
+  chainsaw:
+    build: .
+    image: chainsaw-mcp:local
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${MCP_BIND_ADDRESS:-127.0.0.1}:${MCP_PORT:-18098}:18098"
+    environment:
+      MCP_AUTH_TOKEN_FILE: /run/secrets/mcp_token
+      MCP_TLS_CERT_FILE: /run/secrets/tls_cert
+      MCP_TLS_KEY_FILE: /run/secrets/tls_key
+      MCP_TLS_CA_FILE: /run/secrets/tls_ca
+      CHAINSAW_TRANSFER_SIGNING_KEY_FILE: /run/secrets/transfer_signing_key
+      CHAINSAW_UPLOAD_TRUSTED_KEYS_DIR: /run/upload-trust
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      CHAINSAW_THREADS: ${CHAINSAW_THREADS:-4}
+      CHAINSAW_TIMEOUT: ${CHAINSAW_TIMEOUT:-600}
+    secrets:
+      - mcp_token
+      - tls_cert
+      - tls_key
+      - tls_ca
+      - transfer_signing_key
+    volumes:
+      - type: bind
+        source: ${CHAINSAW_EVIDENCE_PATH:-./evidence}
+        target: /evidence
+        read_only: true
+        bind:
+          create_host_path: false
+      - chainsaw_data:/data
+      - type: bind
+        source: ${CHAINSAW_UPLOAD_TRUST_SOURCE:-./secrets/upload-trust}
+        target: /run/upload-trust
+        read_only: true
+        bind:
+          create_host_path: false
+    # The image health check probes https://127.0.0.1:18098/mcp. If the certificate lacks
+    # that IP SAN, probe a covered name that resolves to loopback inside the container
+    # (and is allowed by MCP_ALLOWED_HOSTS):
+    # extra_hosts:
+    #   - "forensics.example:127.0.0.1"
+    # healthcheck:
+    #   test: ["CMD", "python", "/opt/chainsaw-mcp/healthcheck.py", "--attempts", "1",
+    #          "https://forensics.example:18098/mcp"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 4g
+    pids_limit: 512
+
+secrets:
+  mcp_token:
+    file: ${MCP_AUTH_TOKEN_SOURCE:-./secrets/mcp_token}
+  tls_cert:
+    file: ${MCP_TLS_CERT_SOURCE:-./secrets/tls.crt}
+  tls_key:
+    file: ${MCP_TLS_KEY_SOURCE:-./secrets/tls.key}
+  tls_ca:
+    file: ${MCP_TLS_CA_SOURCE:-./secrets/tls.crt}
+  transfer_signing_key:
+    file: ${CHAINSAW_TRANSFER_SIGNING_KEY_SOURCE:-./secrets/server-signing.key}
+
+volumes:
+  chainsaw_data:

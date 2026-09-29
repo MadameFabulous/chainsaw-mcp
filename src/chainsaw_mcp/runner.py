@@ -69,6 +69,13 @@ class Runner:
             )
         return self.binary
 
+    def command(self, args: list[str]) -> list[str]:
+        """Build the exact invocation shared by execution and command planning."""
+        argv = [str(self.require()), "--no-banner"]
+        if self.threads:
+            argv.append(f"--num-threads={self.threads}")
+        return argv + list(args)
+
     def run(self, args: list[str], *, cwd: Path | None = None) -> RunResult:
         """Run one chainsaw command.
 
@@ -76,12 +83,7 @@ class Runner:
         ``[!] failed to load file`` and ``[x] Failed to hunt through file`` lines that tell
         an analyst which evidence was skipped, so every run keeps its full message stream.
         """
-        binary = self.require()
-        argv = [str(binary), "--no-banner"]
-        if self.threads:
-            argv.append(f"--num-threads={self.threads}")
-        args = list(args)
-        argv.extend(args)
+        argv = self.command(args)
         start = time.monotonic()
         try:
             proc = subprocess.run(  # noqa: S603 - argv list, no shell, binary is configured

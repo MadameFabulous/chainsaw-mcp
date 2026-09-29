@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Opt-in `redact_paths` replay/plan exports label rebased paths and require explicit input
+  roots; default exports retain verbatim provenance. Legacy EVTX overview replay exports
+  report machine-readable partial status per handle and in the response/manifest header.
+- Digest pins for Python, uv and the Dockerfile frontend, with a documented refresh process.
+  The container gate supports Docker-capable CI runners; build networking is configurable
+  and checks use unique, automatically removed image tags.
+- `chainsaw_evidence_manifest` and `chainsaw_evidence_validate` create signed full-directory
+  inventories and validation receipts for chain-of-custody activities. They include hidden
+  files, portable relative paths, custody declarations, independent signer trust and explicit
+  mismatch/incomplete outcomes. See `docs/custody.md` for preservation and provenance limits.
+- Native HTTPS with certificate-verified clients and health probes; remote listeners require
+  TLS certificates and bearer authentication, including behind gateways.
+- Trusted Ed25519 upload signatures, `chainsaw_result_manifest` for signed downloads,
+  atomic verified client downloads with signature receipts, and `chainsaw-mcp-transfer`
+  key generation/offline verification. Existing HTTP and unsigned upload clients must migrate;
+  see `docs/secure-transfers.md`. Existing published evidence is preserved.
+- Self-contained non-root Docker image and Compose deployment with authenticated remote
+  MCP, read-only host/NFS/SMB evidence mounts, persistent state and endpoint health checks.
+- Resumable remote uploads with declared size/SHA-256 verification, storage quotas and
+  atomic publication; a remote client uploads evidence and downloads result artefacts.
+- `chainsaw_reproduce` exports recorded native invocations, mapping snapshots and an
+  export-time checksum manifest; `chainsaw_plan` validates unexecuted investigation steps
+  using the same argument construction as live tools. Both provide downloadable scripts.
+- Multi-command histories for current lineage and EVTX overview result handles.
+- Real native replay tests and a GitHub container build/remote workflow gate.
 - Jev assessments list `uncertain_reasons`: insufficient context, low classification
   confidence, low priority confidence or validation failure. The existing `uncertain`
   boolean and default `min_confidence=0.8` are preserved, with threshold guidance.
@@ -36,6 +61,26 @@ All notable changes to this project are documented here. The format follows
   Both proposed prompt revisions remain experimental; runtime questions are unchanged.
 
 ### Changed
+- Signature verification requires an expected purpose: upload, download and custody
+  consumers reject signatures made for another purpose, and `chainsaw-mcp-transfer verify`
+  takes `--purpose` (default `download`; custody records need `evidence-manifest` or
+  `evidence-validation`).
+- The server refuses an `MCP_AUTH_TOKEN_FILE` with any group or other permission bits; the
+  health probe warns instead. Docs make container secrets owned by UID 10001 with mode 0400.
+- Validation receipts record unreadable directories and files as `unreadable` rows and
+  continue (status `incomplete`), report `mismatches_found` and `truncated`, and may grow to
+  four times the manifest cap, with headroom so a truncated receipt is still signed.
+- Replay scripts set `NO_COLOR=1`, run commands with stdin from `/dev/null`, and name the
+  failing binary or input on stderr when a digest check fails.
+- An unreadable upload reservation record blocks new uploads with an error naming the
+  record, instead of being counted as zero. The quota-exceeded error states that the quota
+  counts retained uploaded evidence plus incomplete reservations.
+- Remote HTTP always requires a bearer token. `MCP_REQUIRE_AUTH` is deprecated and ignored
+  (a warning is logged if set) and is removed from the image and `.env.example`.
+- The TLS context uvicorn serves with enforces a TLS 1.2 minimum through
+  `ssl_context_factory`; the minimum supported uvicorn is 0.47.
+- SECURITY.md and the `chainsaw_reproduce`/`chainsaw_plan` descriptions state that replay
+  exports and plans deliberately contain server-absolute paths for provenance.
 - Jev answer failures, including missing expected answers, fail only their source row
   with both scores null and `uncertain: true`. Valid rows are retained and sorted before
   failures. Invalid response containers and unknown question keys still reject the batch.
@@ -64,6 +109,19 @@ All notable changes to this project are documented here. The format follows
   like every other evidence tool.
 
 ### Fixed
+- Reproduction manifests list each replay expression once and hash each input file once,
+  but check every distinct expression the commands use, so overlapping evidence roots
+  cannot bypass a checksum check through an independently relocated root.
+- Upload reservation metadata is written atomically, cleaned up on failure, and stores only
+  the signature envelope fields.
+- Validation receipt counters (`matched_files`, `metadata_changed`, status counts) describe
+  only rows actually written, so a truncated matched-directory row no longer yields
+  negative counts.
+- Host-side upload/download examples use the `secrets/mcp_token.client` copy.
+- Deployment rollback to a plain-HTTP release warns loudly that it is unauthenticated and
+  exits non-zero.
+- `scripts/container-check.sh` prints container logs on failure, tolerates cleanup errors
+  and preserves the exit status; it mounts a UID 10001-owned, mode-0400 token.
 - Exact numeric filters preserve large integer precision, including decimal-string
   operands; neighbouring 64-bit values are no longer selected together.
 - Candidate deployment health probes bracket IPv6 addresses, as rollback probes do.

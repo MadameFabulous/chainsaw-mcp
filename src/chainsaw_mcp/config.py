@@ -56,6 +56,12 @@ class Settings:
     bws_binary: str = "bws"
     bws_access_token: str = field(default="", repr=False)
     bws_token_file: str = "~/.config/bitwarden-sm/token"
+    upload_dir: Path | None = None
+    upload_max_bytes: int = 2 * 1024**3
+    upload_quota_bytes: int = 10 * 1024**3
+    upload_trusted_keys_dir: Path | None = None
+    transfer_signing_key_file: Path | None = None
+    custody_trusted_keys_dir: Path | None = None
 
     @property
     def vendor_dir(self) -> Path:
@@ -77,6 +83,20 @@ class Settings:
             "threads": self.threads,
             "max_page": self.max_page,
             "default_preview": self.preview,
+            "uploads": {
+                "enabled": self.upload_dir is not None and self.upload_trusted_keys_dir is not None,
+                "signature_required": True,
+                "max_file_bytes": self.upload_max_bytes,
+                "quota_bytes": self.upload_quota_bytes,
+            },
+            "transfers": {
+                "signature_algorithm": "Ed25519",
+                "download_signing_configured": self.transfer_signing_key_file is not None,
+            },
+            "custody": {
+                "signing_configured": self.transfer_signing_key_file is not None,
+                "additional_trust_configured": self.custody_trusted_keys_dir is not None,
+            },
             "jev": {
                 "enabled": self.jev_enabled,
                 "credentials_configured": bool(self.jev_api_key or self.jev_bws_secret_id),
@@ -117,6 +137,14 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             (home / name).resolve() for name in DEFAULT_EVIDENCE_DIRS if (home / name).is_dir()
         )
 
+    upload_dir = _resolve(home, get("CHAINSAW_UPLOAD_DIR")) if get("CHAINSAW_UPLOAD_DIR") else None
+    if upload_dir:
+        if any(
+            upload_dir.is_relative_to(root) or root.is_relative_to(upload_dir) for root in roots
+        ):
+            raise ValueError("CHAINSAW_UPLOAD_DIR must be separate from mounted evidence roots")
+        roots += (upload_dir / "evidence",)
+
     threads_raw = get("CHAINSAW_THREADS")
     threads = _int(threads_raw, 0, "CHAINSAW_THREADS") if threads_raw else None
     jev_enabled = get("CHAINSAW_JEV_ENABLED", "false").lower()
@@ -144,4 +172,26 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         bws_binary=get("BWS_BINARY", "bws"),
         bws_access_token=get("BWS_ACCESS_TOKEN").strip(),
         bws_token_file=get("BWS_TOKEN_FILE", "~/.config/bitwarden-sm/token"),
+        upload_dir=upload_dir,
+        upload_trusted_keys_dir=(
+            _resolve(home, get("CHAINSAW_UPLOAD_TRUSTED_KEYS_DIR"))
+            if get("CHAINSAW_UPLOAD_TRUSTED_KEYS_DIR")
+            else None
+        ),
+        transfer_signing_key_file=(
+            _resolve(home, get("CHAINSAW_TRANSFER_SIGNING_KEY_FILE"))
+            if get("CHAINSAW_TRANSFER_SIGNING_KEY_FILE")
+            else None
+        ),
+        custody_trusted_keys_dir=(
+            _resolve(home, get("CHAINSAW_CUSTODY_TRUSTED_KEYS_DIR"))
+            if get("CHAINSAW_CUSTODY_TRUSTED_KEYS_DIR")
+            else None
+        ),
+        upload_max_bytes=_int(
+            get("CHAINSAW_UPLOAD_MAX_BYTES"), 2 * 1024**3, "CHAINSAW_UPLOAD_MAX_BYTES"
+        ),
+        upload_quota_bytes=_int(
+            get("CHAINSAW_UPLOAD_QUOTA_BYTES"), 10 * 1024**3, "CHAINSAW_UPLOAD_QUOTA_BYTES"
+        ),
     )

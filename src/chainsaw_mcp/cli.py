@@ -9,7 +9,7 @@ import sys
 
 from . import __version__
 from .config import load_settings
-from .security import transport_security
+from .http import bearer_token, http_app, tls_options
 from .server import build_server
 
 
@@ -65,14 +65,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.transport == "stdio":
         server.run(transport="stdio")
         return 0
-    server.run(
-        transport="streamable-http",
+    token = bearer_token()
+    import uvicorn
+
+    uvicorn.run(
+        http_app(
+            server,
+            host=args.host,
+            port=args.port,
+            path=args.path,
+            json_response=args.json_response,
+            token=token,
+        ),
         host=args.host,
         port=args.port,
-        streamable_http_path=args.path,
-        json_response=args.json_response,
-        stateless_http=True,
-        transport_security=transport_security(args.host, args.port),
+        log_level=args.log_level.lower(),
+        **tls_options(),
     )
     return 0
 

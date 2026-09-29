@@ -21,9 +21,12 @@ Unit tests need no binary. The integration tier needs `vendor/chainsaw` and the 
 ```bash
 bash scripts/quality-check.sh        # ruff, mypy, unit tests with coverage, docs drift, bash -n, build
 bash scripts/integration-check.sh    # real Chainsaw against the pinned sample set
+bash scripts/container-check.sh      # self-contained image + authenticated remote flow (Docker)
 ```
 
-Both scripts are exactly what CI runs. The unit gate fails below 70 % branch coverage and
+These scripts are the CI gates. The Docker gate runs on GitHub's Docker-enabled runner;
+see `docs/docker.md` for prerequisites when using your own runner.
+The unit gate fails below 70 % branch coverage and
 when `docs/tools.md` no longer matches the live tool schema. After changing a tool
 signature, docstring, resource, prompt or `docs/_result-handles.md`, regenerate the
 reference:
@@ -34,8 +37,9 @@ uv run python scripts/gen-tool-docs.py > docs/tools.md
 
 ## Ground rules for changes
 
-- Evidence is read-only. Nothing under an evidence root may ever be written, and every
-  client-supplied path must go through `paths.resolve_under`.
+- Existing evidence is read-only, and every client-supplied read path must go through
+  `paths.resolve_under`. Uploads are the sole ingestion path: stage outside evidence roots,
+  verify declared size/SHA-256, and publish a new server-named file without overwriting.
 - Chainsaw is invoked as an argument list, never through a shell. Keep it that way.
 - Large output goes into result handles, never inline. New tools that can return
   unbounded data must use the `ResultStore` and the byte budgets in `result_budget.py`.

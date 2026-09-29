@@ -1,10 +1,22 @@
 # Deployment
 
+For the primary self-contained container deployment, including authenticated remote
+access, NFS/SMB mounts and uploads, see [Docker deployment](docker.md). This document
+retains the systemd deployment procedure.
+
 chainsaw-mcp runs anywhere a Python 3.11+ interpreter and the Chainsaw binary exist. For
 local agent use the stdio transport in the README is enough. This guide covers running it as
 a long-lived streamable HTTP service on a Linux host: a uv-managed virtual environment, a
 hardened systemd user unit bound to a private (typically Tailscale) address, and a deploy
 script that ships a committed tree over ssh with automatic rollback.
+
+Remote access requires native TLS and bearer authentication. Provision the certificate,
+token and optional file-signing keys using [secure transfer setup](secure-transfers.md).
+Keep service secrets outside the release tree and set their absolute paths in the target's
+`.env` (`MCP_TLS_CERT_FILE`, `MCP_TLS_KEY_FILE`, `MCP_AUTH_TOKEN_FILE`, and the transfer-key
+settings). The token file must be owned by the service user with mode 0400 or 0600; the
+server refuses to start if it grants any group or other access. Stdio remains available
+without remote transport credentials.
 
 ## Service layout on the target
 
@@ -15,7 +27,7 @@ script that ships a committed tree over ssh with automatic rollback.
 | systemd unit | `~/.config/systemd/user/mcp-chainsaw.service`, rendered by `deploy/render-unit.sh` |
 | bind address | the host's Tailscale IPv4 from `tailscale ip -4` (`MCP_HOST` overrides it) |
 | port / path | `18098` / `/mcp` (`MCP_PORT`, `MCP_PATH`) |
-| health probe | `python3 scripts/mcp-health.py http://<host>:18098/mcp` (initialises a session and lists tools) |
+| health probe | `python3 scripts/mcp-health.py https://<host>:18098/mcp` with bearer token and CA trust (initialises a session and lists tools) |
 | evidence root | `<checkout>/evidence`, read-only to the service; copy or mount artefacts here |
 | writable state | `.chainsaw-mcp/results` (result store plus its `.mappings/` cache), `custom-rules/`, `.env` |
 | Host allow-list | the short hostname and the Tailscale MagicDNS name, each with and without a port; DNS-rebinding protection is always on |
@@ -32,15 +44,19 @@ Set the target once and ship a committed tree:
 export CHAINSAW_DEPLOY_NODE=mcp-host.example.ts.net   # ssh host name
 export CHAINSAW_DEPLOY_USER=mcp                       # remote service user
 export CHAINSAW_DEPLOY_KEY=~/.ssh/mcp-host            # optional; omit to use ssh's own key selection
+export MCP_AUTH_TOKEN_FILE=/home/mcp/.config/chainsaw/token  # target-side path for health probe
+export MCP_TLS_CA_FILE=/home/mcp/.config/chainsaw/ca.pem     # target-side CA bundle
 git status --short      # must be clean; the script refuses uncommitted tracked changes
 deploy/deploy-node.sh
 ```
 
 The target must already be in the known_hosts file (`CHAINSAW_DEPLOY_KNOWN_HOSTS`, default
 `~/.ssh/known_hosts`); the script never accepts a new host key. `MCP_HOST`, `MCP_PORT`,
-`MCP_PATH`, `MCP_TS_FQDN` and `MCP_MEMORY_MAX` set in the workstation environment are
+`MCP_PATH`, `MCP_TS_FQDN`, `MCP_MEMORY_MAX`, `MCP_AUTH_TOKEN_FILE` and `MCP_TLS_CA_FILE`
+set in the workstation environment are
 forwarded to the installer so the rendered unit and the health probe use the same
-listener and the requested memory cap.
+listener and the requested memory cap. Only file paths are forwarded for health credentials;
+the files must already exist on the target. The probe does not load the service's `.env`.
 
 What `deploy/deploy-node.sh` does on the workstation:
 
@@ -102,11 +118,12 @@ export PATH="$HOME/.local/bin:$PATH"
 uv sync --locked --no-dev
 uv run --no-dev chainsaw-mcp-bootstrap    # only when vendor/chainsaw/chainsaw is missing
 mkdir -p evidence                          # copy or mount collected artefacts here
-cp -n .env.example .env                    # optional: CHAINSAW_EVIDENCE_ROOTS, MCP_ALLOWED_HOSTS
+cp -n .env.example .env                    # set TLS/auth paths before starting the service
 bash deploy/render-unit.sh > ~/.config/systemd/user/mcp-chainsaw.service
 systemctl --user daemon-reload
 systemctl --user enable --now mcp-chainsaw.service
-python3 scripts/mcp-health.py "http://$(tailscale ip -4):18098/mcp"
+python3 scripts/mcp-health.py "https://$(tailscale ip -4):18098/mcp" \
+  --bearer-token-file /home/mcp/.config/chainsaw/token --ca-file /home/mcp/.config/chainsaw/ca.pem
 journalctl --user -u mcp-chainsaw -n 50 --no-pager
 ```
 
@@ -182,7 +199,10 @@ Bump `CHAINSAW_RELEASE` in `src/chainsaw_mcp/__init__.py` and the checksums in
 - The service makes no outbound connections unless `CHAINSAW_JEV_ENABLED=true`, in which
   case `chainsaw_jev_triage` posts selected result rows to `api.typesafe.ai` over HTTPS
   with redirects disabled. Nothing else leaves the host.
-- The endpoint has no authentication of its own; reachability is the access control.
+- Set `MCP_AUTH_TOKEN_FILE` or `MCP_AUTH_TOKEN` plus `MCP_TLS_CERT_FILE` and
+  `MCP_TLS_KEY_FILE` for authenticated HTTPS; the listener fails closed if these are absent.
+  Distribute the bearer token and signing trust privately. See [Docker deployment](docker.md)
+  and [secure transfers](secure-transfers.md) for the remote security model.
   Bind to a loopback or private overlay address (a tailnet with a restrictive ACL works
   well). Never bind to `0.0.0.0` or a LAN address.
 - Results can contain sensitive log content; treat the results directory like evidence.
